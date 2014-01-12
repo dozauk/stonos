@@ -1,0 +1,56 @@
+{
+    "versionLabel": "1.0",
+    "uuid": "52b62664-bd28-4f3a-a471-37767378eba5",
+    "appKeys": {
+        "zoneone": 3
+    },
+    "longName": "Stonos",
+    "versionCode": 1,
+    "capabilities": [
+        "configurable"
+    ],
+    "shortName": "Stonos",
+    "companyName": "dozauk",
+    "watchapp": {
+        "watchface": false
+    },
+    "resources": {
+        "media": [
+            {
+                "type": "png",
+                "name": "ALBUM_ART_MISSING",
+                "file": "images/icon.png"
+            },
+            {
+                "type": "png",
+                "name": "ICON_VOLUME_UP",
+                "file": "images/volume_up.png"
+            },
+            {
+                "type": "png",
+                "name": "ICON_VOLUME_DOWN",
+                "file": "images/volume_down.png"
+            },
+            {
+                "type": "png",
+                "name": "ICON_REWIND",
+                "file": "images/rw.png"
+            },
+            {
+                "type": "png",
+                "name": "ICON_FAST_FORWARD",
+                "file": "images/ff.png"
+            },
+            {
+                "type": "png",
+                "name": "ICON_PLAY",
+                "file": "images/play.png"
+            },
+            {
+                "type": "png",
+                "name": "ICON_PAUSE",
+                "file": "images/pause.png"
+            }
+        ]
+    }
+}

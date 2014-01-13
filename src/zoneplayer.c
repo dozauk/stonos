@@ -1,5 +1,6 @@
 #include "pebble.h"
-	
+#include "marquee_text.h"
+#include "progress_bar.h"
 
 static Window *window;
 static ActionBarLayer *action_bar;
@@ -19,6 +20,9 @@ static GBitmap *icon_rewind;
 static GBitmap *icon_volume_up;
 static GBitmap *icon_volume_down;
 
+static time_t last_updated;
+static uint8_t last_track_progress;
+
 static AppSync sync;
 static uint8_t sync_buffer[256];
 
@@ -34,7 +38,8 @@ enum ZoneKey {
 
 };
 
-static void click_config_provider(ClickConfig **config, void *context);
+//static void click_config_provider(ClickConfig **config, void *context);
+static void click_config_provider(void* context);
 static void window_unload(Window* window);
 static void window_load(Window* window);
 static void clicked_up(ClickRecognizerRef recognizer, void *context);
@@ -49,7 +54,8 @@ static void display_no_album();
 
 static bool controlling_volume = false;
 static bool is_shown = false;
-static AppTimerHandle timer = 0;
+//static AppTimerHandle timer = 0;
+static AppTimer *timer;
 
 void show_zoneplayer(int zoneid) {
 	window = window_create();
@@ -63,15 +69,77 @@ void show_zoneplayer(int zoneid) {
 
 
 void now_playing_tick() {
-    progress_bar_layer_set_value(progress_bar, sonos_zone_state_current_time());
+	uint8_t progress = last_track_progress + (time(NULL)-last_updated);
+    progress_bar_layer_set_value(progress_bar, progress);
 }
 
 void now_playing_animation_tick() {
     if(!is_shown) return;
-    app_timer_cancel_event(g_app_context, timer);
-    timer = app_timer_send_event(g_app_context, 33, 1);
+    now_playing_tick();
+    timer = app_timer_register(1000, now_playing_animation_tick, NULL);
 }
 
+
+
+static void sync_error_callback(DictionaryResult dict_error, AppMessageResult app_message_error, void *context) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Sync Error: %d", app_message_error);
+}
+
+static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Sync sync_tuple_changed_callback");
+  if (!is_shown) return;
+	uint8_t state;
+	
+	switch (key) {
+    case ZONE_GROUP_NAME:
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_GROUP_NAME");
+      break;
+
+    case ZONE_ALBUM:
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_ALBUM:%s", new_tuple->value->cstring);
+      // App Sync keeps new_tuple in sync_buffer, so we may use it directly
+      marquee_text_layer_set_text(album_layer, new_tuple->value->cstring);
+      break;
+
+    case ZONE_ARTIST:
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_ARTIST:%s", new_tuple->value->cstring);
+      marquee_text_layer_set_text(artist_layer, new_tuple->value->cstring);
+      break;
+
+    case ZONE_TITLE:
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_TITLE:%s", new_tuple->value->cstring);
+      marquee_text_layer_set_text(title_layer, new_tuple->value->cstring);
+      break;	
+	
+    case ZONE_DURATION:
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_DURATION:%d", new_tuple->value->uint8);
+      progress_bar_layer_set_range(progress_bar, 0, new_tuple->value->uint8);
+      break;	
+
+    case ZONE_CURRENT_TIME:
+		last_track_progress = new_tuple->value->uint8;
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_CURRENT_TIME:%d", last_track_progress);
+		progress_bar_layer_set_value(progress_bar, last_track_progress);
+	  last_updated = time(NULL);
+      break;	
+		
+    case ZONE_PLAY_STATE:
+		state = new_tuple->value->uint8;
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_PLAY_STATE:%d", state);
+      if (state != 1) // not playing
+	  {
+		   action_bar_layer_set_icon(action_bar, BUTTON_ID_SELECT, icon_play);
+	  }
+		else
+		{
+			action_bar_layer_set_icon(action_bar, BUTTON_ID_SELECT, icon_pause);
+		}
+		
+      break;			
+		
+		
+  }
+}
 
 static void window_load(Window* window) {
     // Load bitmaps for action bar icons.
@@ -97,15 +165,15 @@ static void window_load(Window* window) {
     // Text labels
     title_layer = marquee_text_layer_create(GRect(2, 0, 118, 35));
     marquee_text_layer_set_font(title_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
-    marquee_text_layer_set_text(title_layer, zone_get_title());
+    marquee_text_layer_set_text(title_layer, "Loading title..");
 	
     album_layer = marquee_text_layer_create(GRect(2, 130, 118, 23));
     marquee_text_layer_set_font(album_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
-    marquee_text_layer_set_text(album_layer, zone_get_album());
+    marquee_text_layer_set_text(album_layer, "Loading album..");
     
 	artist_layer = marquee_text_layer_create(GRect(2, 107, 118, 28));
     marquee_text_layer_set_font(artist_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24));
-    marquee_text_layer_set_text(artist_layer, zone_get_artist());
+    marquee_text_layer_set_text(artist_layer, "Loading artist..");
     
     layer_add_child(window_get_root_layer(window), title_layer);
     layer_add_child(window_get_root_layer(window), album_layer);
@@ -157,66 +225,12 @@ static void window_load(Window* window) {
 	
 	
     is_shown = true;
-    now_playing_animation_tick();
-}
-
-
-static void sync_error_callback(DictionaryResult dict_error, AppMessageResult app_message_error, void *context) {
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Sync Error: %d", app_message_error);
-}
-
-static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Sync sync_tuple_changed_callback");
-  if (!is_shown) return;
 	
-	switch (key) {
-    case ZONE_GROUP_NAME:
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_GROUP_NAME");
-      break;
-
-    case ZONE_ALBUM:
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_ALBUM:%s", new_tuple->value->cstring);
-      // App Sync keeps new_tuple in sync_buffer, so we may use it directly
-      marquee_text_layer_set_text(album_layer, new_tuple->value->cstring);
-      break;
-
-    case ZONE_ARTIST:
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_ARTIST:%s", new_tuple->value->cstring);
-      marquee_text_layer_set_text(artist_layer, new_tuple->value->cstring);
-      break;
-
-    case ZONE_TITLE:
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_TITLE:%s", new_tuple->value->cstring);
-      marquee_text_layer_set_text(title_layer, new_tuple->value->cstring);
-      break;	
+	timer = app_timer_register(1000, now_playing_animation_tick, NULL);
 	
-    case ZONE_DURATION:
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_DURATION:%d", new_tuple->value->uint8);
-      progress_bar_layer_set_range(progress_bar, 0, new_tuple->value->uint8);
-      break;	
-
-    case ZONE_CURRENT_TIME:
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_CURRENT_TIME:%d", new_tuple->value->uint8);
-      progress_bar_layer_set_value(progress_bar, new_tuple->value->uint8);
-      break;	
-		
-    case ZONE_PLAY_STATE:
-		uint8_t state = new_tuple->value->uint8
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_PLAY_STATE:%d", state);
-      if (state != 1) // not playing
-	  {
-		   action_bar_layer_set_icon(action_bar, BUTTON_ID_SELECT, icon_play);
-	  }
-		else
-		{
-			action_bar_layer_set_icon(action_bar, BUTTON_ID_SELECT, icon_pause);
-		}
-		
-      break;			
-		
-		
-  }
 }
+
+
 
 static void window_unload(Window* window) {
 	
@@ -243,11 +257,46 @@ static void window_unload(Window* window) {
 
 
 
+
+static void click_config_provider(void* context) {
+  const uint16_t repeat_interval_ms = 100;
+  window_set_click_context(BUTTON_ID_UP, context);
+  window_single_repeating_click_subscribe(BUTTON_ID_UP, repeat_interval_ms, clicked_up);
+
+  window_set_click_context(BUTTON_ID_SELECT, context);
+  window_single_click_subscribe(BUTTON_ID_SELECT, clicked_select);
+  window_long_click_subscribe(BUTTON_ID_SELECT, 0, long_clicked_select, NULL);
+	
+
+  window_set_click_context(BUTTON_ID_DOWN, context);
+  window_single_repeating_click_subscribe(BUTTON_ID_DOWN, repeat_interval_ms, clicked_down);
+}
+
+/*
 static void click_config_provider(ClickConfig **config, void* context) {
     config[BUTTON_ID_DOWN]->click.handler = clicked_down;
     config[BUTTON_ID_UP]->click.handler = clicked_up;
     config[BUTTON_ID_SELECT]->click.handler = clicked_select;
     config[BUTTON_ID_SELECT]->long_click.handler = long_clicked_select;
+}
+*/
+
+
+
+static void send_state_change(int8_t state) {
+  Tuplet value = TupletInteger(1, state);
+
+  DictionaryIterator *iter;
+  app_message_outbox_begin(&iter);
+
+  if (iter == NULL) {
+    return;
+  }
+
+  dict_write_tuplet(iter, &value);
+  dict_write_end(iter);
+
+  app_message_outbox_send();
 }
 
 static void clicked_up(ClickRecognizerRef recognizer, void *context) {
@@ -279,8 +328,9 @@ static void long_clicked_select(ClickRecognizerRef recognizer, void *context) {
     }
 }
 
-
+/*
 static void display_no_album() {
     resource_load(resource_get_handle(RESOURCE_ID_ALBUM_ART_MISSING), album_art_data, 512);
-    layer_mark_dirty((Layer*)&album_art_layer);
+    layer_mark_dirty(album_art_layer);
 }
+*/

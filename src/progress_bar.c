@@ -57,5 +57,5 @@ static void update_proc(ProgressBarLayer* bar, GContext *context) {
 void progress_bar_layer_destroy(ProgressBarLayer* bar) {
 	layer_destroy(bar);
 }
-}
+
 

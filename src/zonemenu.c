@@ -1,4 +1,5 @@
 #include "zonemenu.h"
+#include "zoneplayer.h"
 #include <pebble.h>
 	
 static void open_zone1(int index, void* context);
@@ -40,13 +41,13 @@ SimpleMenuLayer* zone_menu_create(Window* window) {
 }
 
 static void open_zone1(int index, void* context) {
-    show_zone(1);
+    show_zoneplayer(1);
 }
 static void open_zone2(int index, void* context) {
-    show_zone(2);
+    show_zoneplayer(2);
 }
 static void open_zone3(int index, void* context) {
-    show_zone(3);
+    show_zoneplayer(3);
 }
 
 static void pause_all(int index, void* context) {
@@ -54,7 +55,3 @@ static void pause_all(int index, void* context) {
 }
 
 
-static void show_zone(int zoneid)
-{
-	return;
-}

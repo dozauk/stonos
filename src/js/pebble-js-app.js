@@ -518,6 +518,7 @@ var _port = ':1400';
 var _currentArtist = "";
 var _currentComposer = "";
 var _currentAlbum = "";
+var _lastTrack = "";
 var _selectedZone = 0;  // zone serving up media
 var _refreshRate = 15000; // milliseconds
 var _debug = false;
@@ -799,23 +800,31 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
             }
         }
         if (currNodeName == "TrackMetaData") {
-			console.log(currNode.text); //TODO: FIX!
-			var innerMetadataXML = new REXML(currNode.text);
+			console.log("XML text: " + XMLEscape.unescape(currNode.text)); //TODO: FIX!
+			var innerMetadataXML = new REXML(XMLEscape.unescape(currNode.text));
 			
-            var responseNodes2 = innerMetadataXML.rootElement.childElements;
-            var isStreaming = false;
-            for (var j = 0; j < responseNodes2.length; j++) {
-                switch (responseNodes2[j].name) {
-                    case "creator":
-                        _currentComposer = XMLEscape.unescape(responseNodes2[j].firstChild.nodeValue);
+			var isStreaming = false;
+			
+			var xmlmetaiterator = new JSXMLIterator(innerMetadataXML.rootElement);
+			while (xmlmetaiterator.getNextNode())
+			{
+			
+            //var responseNodes2 = innerMetadataXML.rootElement.childElements;
+				var metanode = xmlmetaiterator.xmleElem;
+				console.log("Processing metadata node: " + metanode.name + " with text: " + metanode.text);
+				
+           // for (var j = 0; j < responseNodes2.length; j++) {
+                switch (metanode.name) {
+					case "dc:creator":
+                        _currentComposer = XMLEscape.unescape(metanode.text);
                         /*if (_currentComposer !== jQuery('#composerName')[0].innerHTML) {
                             jQuery('#composerName')[0].innerHTML = _currentComposer;
                         }
                         jQuery('#ComposerMetadata')[0].className = "ElementVisible";*/
 						console.log("Current Composer:" + _currentComposer);
                         break;
-                    case "albumArtist":
-                        _currentArtist = XMLEscape.unescape(responseNodes2[j].firstChild.nodeValue);
+					case "dc:albumArtist":
+                        _currentArtist = XMLEscape.unescape(metanode.text);
                         /*if (_currentArtist !== jQuery('#artistName')[0].innerHTML) {
                             jQuery('#artistName')[0].innerHTML = _currentArtist;
                         }
@@ -823,10 +832,10 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
 						*/
 						console.log("Current Artist:" + _currentArtist);
                         break;
-                    case "title":
+					case "dc:title":
                         if (!isStreaming) {
 							
-                            _currentTrack = XMLEscape.unescape(responseNodes2[j].firstChild.nodeValue);
+                            _currentTrack = XMLEscape.unescape(metanode.text);
                             if (_currentTrack !== _lastTrack)
 							{
 								_trackChange = true;
@@ -848,8 +857,8 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
                         break;
 
                     case "streamContent":
-                        if (responseNodes2[j].attributes.getNamedItem('protocolInfo') !== null) {
-                            _currentTrack = responseNodes2[j].attributes.getNamedItem('protocolInfo').value;
+                        if (metanode.attribute('protocolInfo') !== null) {
+                            _currentTrack = metanode.attribute('protocolInfo');
                             if (_currentTrack.length > 1) {
 							if (_currentTrack !== _lastTrack)
 							{
@@ -875,8 +884,8 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
                         }
                         break;
 
-                    case "album":
-                        _currentAlbum = XMLEscape.unescape(responseNodes2[j].firstChild.nodeValue);
+					case "dc:album":
+                        _currentAlbum = XMLEscape.unescape(metanode.text);
 						/*
                         if (_currentAlbum !== jQuery('#albumName')[0].innerHTML) {
                             jQuery('#albumName')[0].innerHTML = _currentAlbum;
@@ -887,7 +896,7 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
 						console.log("Current Album:" + _currentAlbum);
                         break;
                     case "res":
-                        var protocolInfo = responseNodes2[j].attributes.getNamedItem('protocolInfo').value;
+                        var protocolInfo = metanode.attribute('protocolInfo');
                         if (protocolInfo !== undefined) {
                             for (var k = 0; k < _providers.length; k++) {
                                 if (protocolInfo.toLowerCase().indexOf(_providers[k].keyword) > -1) {

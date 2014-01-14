@@ -500,9 +500,9 @@ function RepeatChar(sChar,iNum) {
 
 // Global variables that need to be customized to the environment.
 var _sonosTopology = { "zones": [
-    { "name": "kitchen", "ip": "192.168.0.4", "id": "RINCON_000E58543E0201400" },
-    { "name": "living room", "ip": "192.168.0.10", "id": "RINCON_000E582B0AEE01400" },
-    { "name": "family room", "ip": "192.168.0.15", "id": "RINCON_000E58F383A801400" }
+	{ "name": "kitchen", "ip": "192.168.0.4", "id": "RINCON_000E58543E0201400", "title":"<Loading1>", "album":"<Loading1>", "creator":"<Loading1>" },
+    { "name": "living room", "ip": "192.168.0.10", "id": "RINCON_000E582B0AEE01400", "title":"<Loading2>", "album":"<Loading2>", "creator":"<Loading2>" },
+    { "name": "family room", "ip": "192.168.0.15", "id": "RINCON_000E58F383A801400", "title":"<Loading3>", "album":"<Loading3>", "creator":"<Loading3>" }
 ]
 };
 var _providers = [{ "name": "Spotify", "keyword": "spotify" },
@@ -773,7 +773,7 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
         var currNodeName = currNode.name;
 		console.log("nodename = " + currNodeName);
         if (currNodeName == "TrackURI") {
-            var result = currNode.firstChild.nodeValue;
+            var result = currNode.text;
             if (result.indexOf("x-rincon") > -1) {
                 var master = result.split(":")[1];
                 var indx = _selectedZone;
@@ -979,7 +979,14 @@ Pebble.addEventListener("ready",
                         function(e) {
                           console.log("in ready event! ready = " + e.ready);
                           console.log("e.type = " + e.type);
-							refreshCurrentlyPlaying(1);
+							// console.log("Loading zones from config" ); // TODO
+							// Load zones from config
+							// Set up zone state object by copying in zones
+							// Kick off a refresh for each zone to load a starting state
+							refreshCurrentlyPlaying(2);
+							
+							// Perhaps eventually a 10 second timer to kick another refresh off from the time of the last one?
+							
 							
                         });
 
@@ -989,6 +996,12 @@ Pebble.addEventListener("appmessage",
 						  console.log("e.type = " + e.type);
                           console.log("e.payload.temperature = " + e.payload.temperature);
 							//refreshCurrentlyPlaying(1);
+							
+							// If we have loaded a 'now playing' screen for a zone
+							// refresh continuously
+							// 1. either have the watch keep asking for updates after the last one was sent (i.e. synchronous)
+							// or 2. just keep polling on the JS side a sync via AppSync
+							
                         });
 
 

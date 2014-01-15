@@ -41,13 +41,13 @@ SimpleMenuLayer* zone_menu_create(Window* window) {
 }
 
 static void open_zone1(int index, void* context) {
-    show_zoneplayer(1);
+    show_zoneplayer(0);
 }
 static void open_zone2(int index, void* context) {
-    show_zoneplayer(2);
+    show_zoneplayer(1);
 }
 static void open_zone3(int index, void* context) {
-    show_zoneplayer(3);
+    show_zoneplayer(2);
 }
 
 static void pause_all(int index, void* context) {

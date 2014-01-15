@@ -22,11 +22,14 @@ static GBitmap *icon_volume_down;
 
 static time_t last_updated;
 static uint8_t last_track_progress;
+static uint8_t volume;
+static uint8_t muted;
+static uint8_t _zoneid;
 
 static AppSync sync;
 static uint8_t sync_buffer[256];
 
-enum ZoneKey {
+enum ZoneMessageKey {
 
 	ZONE_GROUP_NAME = 0x0,		//TUPLE_STRING
 	ZONE_ALBUM = 0x1,			//TUPLE_STRING
@@ -35,7 +38,17 @@ enum ZoneKey {
 	ZONE_DURATION = 0x4, 		//TUPLE_INT
 	ZONE_CURRENT_TIME = 0x5, 	//TUPLE_INT
 	ZONE_PLAY_STATE = 0x6, 		//TUPLE_INT 0:stopped, 1:playing, 2:paused	
+	ZONE_VOLUME = 0x7, 			//TUPLE_INT 
+	ZONE_MUTE = 0x8, 			//TUPLE_INT 1 = muted
 
+	ZONE_ACTION = 0xa,			// TUPLE_INT 1:back, 2:next
+	ZONE_INIT = 0xb
+};
+
+enum ZoneActionKey {
+	ZACTION_INIT = 0x0,			// request a refresh
+	ZACTION_BACK = 0x1,
+	ZACTION_NEXT = 0x2,
 };
 
 //static void click_config_provider(ClickConfig **config, void *context);
@@ -48,7 +61,7 @@ static void long_clicked_select(ClickRecognizerRef recognizer, void *context);
 static void clicked_down(ClickRecognizerRef recognizer, void *context);
 static void request_now_playing();
 static void send_state_change(int8_t change);
-
+static void request_zone_data();
 
 static void display_no_album();
 
@@ -58,6 +71,7 @@ static bool is_shown = false;
 static AppTimer *timer;
 
 void show_zoneplayer(int zoneid) {
+	_zoneid = zoneid;
 	window = window_create();
     //window_init(window, sprintf("Zone %d", zoneid);	//TODO replace with name
     window_set_window_handlers(window, (WindowHandlers){
@@ -79,6 +93,23 @@ void now_playing_animation_tick() {
     timer = app_timer_register(1000, now_playing_animation_tick, NULL);
 }
 
+
+static void in_dropped_handler(AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Dropped!");
+}
+
+static void out_failed_handler(DictionaryIterator *failed, AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Failed to Send!");
+}
+
+static void app_message_init(void) {
+  // Register message handlers
+  //app_message_register_inbox_received(in_received_handler);
+  app_message_register_inbox_dropped(in_dropped_handler);
+  app_message_register_outbox_failed(out_failed_handler);
+  // Init buffers
+  app_message_open(256, 256);
+}
 
 
 static void sync_error_callback(DictionaryResult dict_error, AppMessageResult app_message_error, void *context) {
@@ -136,7 +167,17 @@ static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tup
 		}
 		
       break;			
-		
+
+	 case ZONE_VOLUME:
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_VOLUME:%d", new_tuple->value->uint8);
+      	volume = new_tuple->value->uint8;
+      break;	
+
+
+	 case ZONE_MUTE:
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_MUTE:%d", new_tuple->value->uint8);
+      	muted = new_tuple->value->uint8;
+      break;			
 		
   }
 }
@@ -209,6 +250,7 @@ static void window_load(Window* window) {
 	*/
 	
 	// Start App Sync
+	app_message_init();
 	
 	Tuplet initial_values[] = {
 		TupletCString(ZONE_GROUP_NAME, "Loading Zone"),
@@ -218,10 +260,14 @@ static void window_load(Window* window) {
 		TupletInteger(ZONE_DURATION, (uint8_t) 100),
 		TupletInteger(ZONE_CURRENT_TIME, (uint8_t) 50),
 		TupletInteger(ZONE_PLAY_STATE, (uint8_t) 0), //0:stopped, 1:playing, 2:paused
+		TupletInteger(ZONE_VOLUME, (uint8_t) 0), //
+		TupletInteger(ZONE_MUTE, (uint8_t) 0), //0 = normal, 1 = muted
 	  };
 
   app_sync_init(&sync, sync_buffer, sizeof(sync_buffer), initial_values, ARRAY_LENGTH(initial_values),
       sync_tuple_changed_callback, sync_error_callback, NULL);	
+	
+	request_zone_data(); // request an initial data pump for this zone
 	
 	
     is_shown = true;
@@ -251,7 +297,8 @@ static void window_unload(Window* window) {
 	gbitmap_destroy(icon_volume_up);
 	gbitmap_destroy(icon_volume_down);
     
-    //ipod_state_set_callback(NULL);
+	app_sync_deinit(&sync);
+	
     is_shown = false;
 }
 
@@ -282,14 +329,47 @@ static void click_config_provider(ClickConfig **config, void* context) {
 */
 
 
+static void send_sync_change(int8_t state) {
+	
+	if (state == 64) {// volume up
+		
+		if (volume < 100) volume++;
+		Tuplet changed_values[] = {
+		TupletInteger(ZONE_VOLUME, (uint8_t) volume), 
+	  };
+		app_sync_set(&sync, changed_values, ARRAY_LENGTH(changed_values));
+	}
+	
+	if (state == -64) {// volume down
+		if (volume > 0) volume--;
+		Tuplet changed_values[] = {
+		TupletInteger(ZONE_VOLUME, (uint8_t) volume), // deal with invalid values on the other side
+	  };
+		app_sync_set(&sync, changed_values, ARRAY_LENGTH(changed_values));
+	}
 
-static void send_state_change(int8_t state) {
-  Tuplet value = TupletInteger(1, state);
+	if (state == 0) {// play/pause
+		if (state != 1) state = 1; else state = 2; // if not playing, make playing
+		Tuplet changed_values[] = {
+		   TupletInteger(ZONE_PLAY_STATE, state) //0:stopped, 1:playing, 2:paused			
+	  };
+		app_sync_set(&sync, changed_values, ARRAY_LENGTH(changed_values));
+	}	
+	
+	
+}
+
+
+
+static void request_zone_data() {
+	
+  Tuplet value = TupletInteger(ZONE_INIT, _zoneid);
 
   DictionaryIterator *iter;
   app_message_outbox_begin(&iter);
 
   if (iter == NULL) {
+	  APP_LOG(APP_LOG_LEVEL_DEBUG, "No iterator in send_state_change!");
     return;
   }
 
@@ -297,11 +377,53 @@ static void send_state_change(int8_t state) {
   dict_write_end(iter);
 
   app_message_outbox_send();
+
+}
+
+static void send_action(int8_t action) {
+	
+  Tuplet value = TupletInteger(ZONE_ACTION, action);
+
+  DictionaryIterator *iter;
+  app_message_outbox_begin(&iter);
+
+  if (iter == NULL) {
+	  APP_LOG(APP_LOG_LEVEL_DEBUG, "No iterator in send_state_change!");
+    return;
+  }
+
+  dict_write_tuplet(iter, &value);
+  dict_write_end(iter);
+
+  app_message_outbox_send();
+
+}
+
+static void send_state_change(int8_t state) {
+	
+	send_sync_change(state);
+		/*
+  Tuplet value = TupletInteger(1, state);
+
+  DictionaryIterator *iter;
+  app_message_outbox_begin(&iter);
+
+  if (iter == NULL) {
+	  APP_LOG(APP_LOG_LEVEL_DEBUG, "No iterator in send_state_change!");
+    return;
+  }
+
+  dict_write_tuplet(iter, &value);
+  dict_write_end(iter);
+
+  app_message_outbox_send();
+  */
 }
 
 static void clicked_up(ClickRecognizerRef recognizer, void *context) {
     if(!controlling_volume) {
-        send_state_change(-1);
+		send_action(ZACTION_BACK); // back
+        //send_state_change(-1);
     } else {
         send_state_change(64);
     }
@@ -311,7 +433,8 @@ static void clicked_select(ClickRecognizerRef recognizer, void *context) {
 }
 static void clicked_down(ClickRecognizerRef recognizer, void *context) {
     if(!controlling_volume) {
-        send_state_change(1);
+        //send_state_change(1);
+		send_action(ZACTION_NEXT); // next
     } else {
         send_state_change(-64);
     }

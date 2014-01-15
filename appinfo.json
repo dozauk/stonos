@@ -2,7 +2,17 @@
     "versionLabel": "1.0",
     "uuid": "52b62664-bd28-4f3a-a471-37767378eba5",
     "appKeys": {
-        "zoneone": 3
+        "album": 1,
+        "currenttime": 5,
+        "playstate": 6,
+        "title": 3,
+        "muted": 8,
+        "artist": 2,
+        "zoneaction": 10,
+        "volume": 7,
+        "duration": 4,
+        "zoneinit": 11,
+        "zonename": 0
     },
     "longName": "Stonos",
     "versionCode": 1,

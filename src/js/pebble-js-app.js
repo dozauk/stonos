@@ -41,7 +41,7 @@ function REXML(XML) {
 	this.rootElement = null;
 
 	this.parse = REXML_parse;
-	if (this.XML && this.XML != "") this.parse();
+	if (this.XML && this.XML !== "") this.parse();
 }
 
 	function REXML_parse() {
@@ -55,7 +55,7 @@ function REXML(XML) {
 		var strClose = "";
 		var iElements = 0;
 		var xmleLastElement = null;
-		if (this.XML.length == 0) return;
+		if (this.XML.length === 0) return;
 		var arrElementsUnparsed = this.XML.match(reTag);
 		var arrElementsUnparsedText = this.XML.match(reTagText);
 		var i=0;
@@ -66,20 +66,20 @@ function REXML(XML) {
 			strAttributes = arrElementsUnparsed[i].replace(reTag,"$2");
 			strText = arrElementsUnparsedText[i].replace(reTagText,"$3").replace(/[\r\n\t ]+/g, " "); // remove white space
 			strClose = "";
-			if (strTag.indexOf("![CDATA[") == 0) {
+			if (strTag.indexOf("![CDATA[") === 0) {
 				strOpen = "<![CDATA[";
 				strClose = "]]>";
 				strType = "cdata";
-			} else if (strTag.indexOf("!--") == 0) {
+			} else if (strTag.indexOf("!--") === 0) {
 				strOpen = "<!--";
 				strClose = "-->";
 				strType = "comment";
-			} else if (strTag.indexOf("?") == 0) {
+			} else if (strTag.indexOf("?") === 0) {
 				strOpen = "<?";
 				strClose = "?>";
 				strType = "pi";
 			} else strType = "element";
-			if (strClose != "") {
+			if (strClose !== "") {
 				strText = "";
 				if (arrElementsUnparsedText[i].indexOf(strClose) > -1) strText = arrElementsUnparsedText[i];
 				else {
@@ -88,7 +88,7 @@ function REXML(XML) {
 					}
 					strText += arrElementsUnparsedText[i];
 				}
-				if (strText.substring(strOpen.length, strText.indexOf(strClose)) != "")	{
+				if (strText.substring(strOpen.length, strText.indexOf(strClose)) !== "")	{
 					xmleLastElement.childElements[xmleLastElement.childElements.length] = new REXML_XMLElement(strType, "","",xmleLastElement,strText.substring(strOpen.length, strText.indexOf(strClose)));
 					if (strType == "cdata") xmleLastElement.text += strText.substring(strOpen.length, strText.indexOf(strClose));
 				}
@@ -98,27 +98,27 @@ function REXML(XML) {
 				}
 				continue;
 			}
-			if (strText.replace(/ */, "") == "") strText = "";
+			if (strText.replace(/ */, "") === "") strText = "";
 			if (arrElementsUnparsed[i].substring(1,2) != "/") {
-				if (iElements == 0) {
+				if (iElements === 0) {
 					xmleLastElement = this.rootElement = new REXML_XMLElement(strType, strTag,strAttributes,null,strText);
 					iElements++;
-					if (strText != "") xmleLastElement.childElements[xmleLastElement.childElements.length] = new REXML_XMLElement("text", "","",xmleLastElement,strText);
+					if (strText !== "") xmleLastElement.childElements[xmleLastElement.childElements.length] = new REXML_XMLElement("text", "","",xmleLastElement,strText);
 				} else if (arrElementsUnparsed[i].substring(arrElementsUnparsed[i].length-2,arrElementsUnparsed[i].length-1) != "/") {
 					xmleLastElement = xmleLastElement.childElements[xmleLastElement.childElements.length] = new REXML_XMLElement(strType, strTag,strAttributes,xmleLastElement,"");
 					iElements++;
-					if (strText != "") {
+					if (strText !== "") {
 						xmleLastElement.text += strText;
 						xmleLastElement.childElements[xmleLastElement.childElements.length] = new REXML_XMLElement("text", "","",xmleLastElement,strText);
 					}
 				} else {
 					xmleLastElement.childElements[xmleLastElement.childElements.length] = new REXML_XMLElement(strType, strTag,strAttributes,xmleLastElement,strText);
-					if (strText != "") xmleLastElement.childElements[xmleLastElement.childElements.length] = new REXML_XMLElement("text", "","",xmleLastElement,strText);
+					if (strText !== "") xmleLastElement.childElements[xmleLastElement.childElements.length] = new REXML_XMLElement("text", "","",xmleLastElement,strText);
 				}
 			} else {
 				xmleLastElement = xmleLastElement.parentElement;
 				iElements--;
-				if (xmleLastElement && strText != "") {
+				if (xmleLastElement && strText !== "") {
 					xmleLastElement.text += strText;
 					xmleLastElement.childElements[xmleLastElement.childElements.length] = new REXML_XMLElement("text", "","",xmleLastElement,strText);
 				}
@@ -500,9 +500,9 @@ function RepeatChar(sChar,iNum) {
 
 // Global variables that need to be customized to the environment.
 var _sonosTopology = { "zones": [
-	{ "name": "kitchen", "ip": "192.168.0.4", "id": "RINCON_000E58543E0201400", "title":"<Loading1>", "album":"<Loading1>", "creator":"<Loading1>" },
-    { "name": "living room", "ip": "192.168.0.10", "id": "RINCON_000E582B0AEE01400", "title":"<Loading2>", "album":"<Loading2>", "creator":"<Loading2>" },
-    { "name": "family room", "ip": "192.168.0.15", "id": "RINCON_000E58F383A801400", "title":"<Loading3>", "album":"<Loading3>", "creator":"<Loading3>" }
+	{ "name": "kitchen", "ip": "192.168.0.4", "id": "RINCON_000E58543E0201400", "title":"<Loading1>", "album":"<Loading1>", "artist":"<Loading1>", "volume":0, "duration":0, "position":0, "muted":0 },
+    { "name": "living room", "ip": "192.168.0.10", "id": "RINCON_000E582B0AEE01400", "title":"<Loading2>", "album":"<Loading2>", "artist":"<Loading2>", "volume":0, "duration":0, "position":0, "muted":0 },
+	{ "name": "family room", "ip": "192.168.0.15", "id": "RINCON_000E58F383A801400", "title":"<Loading3>", "album":"<Loading3>", "artist":"<Loading3>", "volume":0, "duration":0, "position":0, "muted":0 }
 ]
 };
 var _providers = [{ "name": "Spotify", "keyword": "spotify" },
@@ -651,7 +651,23 @@ function soaphandler_metadata() {
   }
     
 }
-	
+
+function curry(fn, scope) {
+    scope = scope || window;
+    var args = [];
+    for (var i = 2, len = arguments.length; i < len; ++i) {
+        args.push(arguments[i]);
+    }
+    return function() {
+        var args2 = [];
+        for (var i = 0; i < arguments.length; i++) {
+            args2.push(arguments[i]);
+        }
+        var argstotal = args.concat(args2);
+        return fn.apply(scope, argstotal);
+    };
+}
+
 // Main Ajax request function. uPnP requests go through here.
 // Here we use jQuery Ajax method because it does cross-domain without hassle.
 function sendSoapRequest(url, host, xml, soapAction, requestType) {
@@ -831,6 +847,7 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
                         jQuery('#ArtistMetadata')[0].className = "ElementVisible";
 						*/
 						console.log("Current Artist:" + _currentArtist);
+						_sonosTopology.zones[indx].artist = _currentArtist
                         break;
 					case "dc:title":
                         if (!isStreaming) {
@@ -853,6 +870,9 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
                             }
                             jQuery('#TrackMetadata')[0].className = "ElementVisible";*/
 							console.log("Current Track:" + _currentTrack);
+							console.log("Current zone:" + _sonosTopology.zones[indx]);
+							console.log("Current title:" + _sonosTopology.zones[indx].title);
+							_sonosTopology.zones[indx].title = _currentTrack;
                         }
                         break;
 
@@ -881,6 +901,7 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
                                 isStreaming = true;
                             }
 							console.log("Current Track:" + _currentTrack);
+							_sonosTopology.zones[indx].title = _currentTrack;
                         }
                         break;
 
@@ -894,6 +915,7 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
                         jQuery('#AlbumMetadata')[0].className = "ElementVisible";
 						*/
 						console.log("Current Album:" + _currentAlbum);
+						_sonosTopology.zones[indx].album = _currentAlbum;
                         break;
                     case "res":
                         var protocolInfo = metanode.attribute('protocolInfo');
@@ -973,7 +995,26 @@ var XMLEscape = {
 };
 
 
-
+function send_zone_data(zone) {
+	
+	 	/*Pebble.sendAppMessage({
+		"volume":17
+        });*/
+	
+ 		Pebble.sendAppMessage({
+		"zonename":"Zone " + zone,
+		"album": _sonosTopology.zones[zone].album,	
+		"artist": _sonosTopology.zones[zone].artist,	
+		"title": _sonosTopology.zones[zone].title,	
+		"duration":99,
+		"currenttime":2,
+		"playstate":1,
+		"volume":17,
+		"muted":0
+        });
+		
+	
+}
 
 Pebble.addEventListener("ready",
                         function(e) {
@@ -993,8 +1034,15 @@ Pebble.addEventListener("ready",
 Pebble.addEventListener("appmessage",
                         function(e) {
 						  console.log("appmessage handler...");
-						  console.log("e.type = " + e.type);
-                          console.log("e.payload.temperature = " + e.payload.temperature);
+						  // console.log("e.type = " + e.type); // = appmessage
+						  console.log("stringified object = " + JSON.stringify(e.payload, null, 4));
+                          
+							if (e.payload.zoneinit)	
+							{
+								console.log("Sending zone data for zone " + e.payload.zoneinit);
+								send_zone_data(e.payload.zoneinit);
+							}
+							
 							//refreshCurrentlyPlaying(1);
 							
 							// If we have loaded a 'now playing' screen for a zone

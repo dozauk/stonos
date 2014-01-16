@@ -500,9 +500,9 @@ function RepeatChar(sChar,iNum) {
 
 // Global variables that need to be customized to the environment.
 var _sonosTopology = { "zones": [
-	{ "name": "kitchen", "ip": "192.168.0.4", "id": "RINCON_000E58543E0201400", "title":"<Loading1>", "album":"<Loading1>", "artist":"<Loading1>", "volume":0, "duration":0, "position":0, "muted":0 },
-    { "name": "living room", "ip": "192.168.0.10", "id": "RINCON_000E582B0AEE01400", "title":"<Loading2>", "album":"<Loading2>", "artist":"<Loading2>", "volume":0, "duration":0, "position":0, "muted":0 },
-	{ "name": "family room", "ip": "192.168.0.15", "id": "RINCON_000E58F383A801400", "title":"<Loading3>", "album":"<Loading3>", "artist":"<Loading3>", "volume":0, "duration":0, "position":0, "muted":0 }
+	{ "name": "kitchen", "ip": "192.168.0.4", "id": "RINCON_000E58543E0201400", "title":"<Loading1>", "album":"<Loading1>", "artist":"<Loading1>", "volume":0, "duration":0, "position":0, "muted":0, "playstate":0 },
+    { "name": "living room", "ip": "192.168.0.10", "id": "RINCON_000E582B0AEE01400", "title":"<Loading2>", "album":"<Loading2>", "artist":"<Loading2>", "volume":0, "duration":0, "position":0, "muted":0, "playstate":0 },
+	{ "name": "family room", "ip": "192.168.0.15", "id": "RINCON_000E58F383A801400", "title":"<Loading3>", "album":"<Loading3>", "artist":"<Loading3>", "volume":0, "duration":0, "position":0, "muted":0, "playstate":0 }
 ]
 };
 var _providers = [{ "name": "Spotify", "keyword": "spotify" },
@@ -553,7 +553,7 @@ function muteOrUnMute(zone, mute) {
     soapAction = "urn:upnp-org:serviceId:RenderingControl#SetMute";
     soapBody = '<u:SetMute xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID><Channel>Master</Channel><DesiredMute>' + mute + '</DesiredMute></u:SetMute>';
     xml = _soapRequestTemplate.replace('{0}', soapBody);
-    sendSoapRequest(url, host, xml, soapAction, RequestType.transport);
+    sendSoapRequest(url, host, xml, soapAction, RequestType.transport, zone);
 }
 
 // Function to process Play, Stop, Pause, Previous and Next commands.
@@ -565,7 +565,7 @@ function transport(zone,cmd) {
     soapAction = "urn:schemas-upnp-org:service:AVTransport:1#" + cmd;
     soapBody = '<u:' + cmd + ' xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Speed>1</Speed></u:' + cmd + '>';
     xml = _soapRequestTemplate.replace('{0}', soapBody);
-    sendSoapRequest(url, host, xml, soapAction, RequestType.transport);
+    sendSoapRequest(url, host, xml, soapAction, RequestType.transport, zone);
 }
 
 // Get playlists.
@@ -577,7 +577,7 @@ function getPlaylists(zone) {
     soapAction = 'urn:schemas-upnp-org:service:ContentDirectory:1#Browse';
     soapBody = '<u:Browse xmlns:u="urn:schemas-upnp-org:service:ContentDirectory:1"><ObjectID>SQ:</ObjectID><BrowseFlag>BrowseDirectChildren</BrowseFlag><Filter></Filter><StartingIndex>0</StartingIndex><RequestedCount>100</RequestedCount><SortCriteria></SortCriteria></u:Browse>';
     xml = _soapRequestTemplate.replace('{0}', soapBody);
-    sendSoapRequest(url, host, xml, soapAction, RequestType.playlists);
+    sendSoapRequest(url, host, xml, soapAction, RequestType.playlists, zone);
 }
 function getPlaylist(zone,value) {
     var url, xml, soapBody, soapAction;
@@ -587,7 +587,7 @@ function getPlaylist(zone,value) {
     soapAction = 'urn:schemas-upnp-org:service:ContentDirectory:1#Browse';
     soapBody = '<u:Browse xmlns:u="urn:schemas-upnp-org:service:ContentDirectory:1"><ObjectID>'+value+'</ObjectID><BrowseFlag>BrowseDirectChildren</BrowseFlag><Filter></Filter><StartingIndex>0</StartingIndex><RequestedCount>1000</RequestedCount><SortCriteria></SortCriteria></u:Browse>';
     xml = _soapRequestTemplate.replace('{0}', soapBody);
-    sendSoapRequest(url, host, xml, soapAction, RequestType.oneplaylist);
+    sendSoapRequest(url, host, xml, soapAction, RequestType.oneplaylist, zone);
 }
 
 // Refresh metadata.
@@ -612,7 +612,18 @@ function refreshCurrentlyPlaying(zone) {
     soapAction = 'urn:schemas-upnp-org:service:AVTransport:1#GetPositionInfo';
     soapBody = '<u:GetPositionInfo xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Channel>Master</Channel></u:GetPositionInfo>';
     xml = _soapRequestTemplate.replace('{0}', soapBody);
-    sendSoapRequest(url, host, xml, soapAction, RequestType.metadata);
+	
+	console.log("Requesting position metadata for zone " + zone);
+    sendSoapRequest(url, host, xml, soapAction, RequestType.metadata, zone);
+	
+	soapAction = 'urn:schemas-upnp-org:service:AVTransport:1#GetTransportInfo';
+	soapBody = '<u:GetTransportInfo xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID><Channel>Master</Channel></u:GetTransportInfo>';
+	xml = _soapRequestTemplate.replace('{0}', soapBody);
+	
+	console.log("Requesting transport metadata for zone " + zone);
+    sendSoapRequest(url, host, xml, soapAction, RequestType.metadata, zone);
+	
+	
     if (!_playlistsRetrieved) {
 		console.log("retrieving playlists for zone " + zone);
         getPlaylists(zone);
@@ -622,106 +633,96 @@ function refreshCurrentlyPlaying(zone) {
 
 	
 	
-function soaphandler_metadata() {
+function soaphandler_metadata(zone) {
+	
   if(this.readyState == this.DONE) {
     if(this.status == 200 && this.responseText != null)
 	{
-		console.log("\n Got 200 response for metadata:" + this.responseText);
-		console.log("\n metadata XML:" + this.responseXML);
-		processSuccessfulAjaxRequestNodes_Metadata(this.responseText, '');
+		console.log("\n [Zone " + zone + "] Got 200 response for metadata:" + this.responseText);
+		//console.log("\n metadata XML:" + this.responseXML); // NULL XML?!
+		processSuccessfulAjaxRequestNodes_Metadata(zone,this.responseText, ''); // parse out response
+		send_zone_data(zone);
       return;
     }
 	  // something went wrong
-	console.log("\n Error in SOAP metadata handler: status = " + this.status + ", readyState = " + this.readyState + ", xml = " + this.responseText);
+	console.log("\n [Zone " + zone + "] Error in SOAP metadata handler: status = " + this.status + ", readyState = " + this.readyState + ", xml = " + this.responseText);
   }
     
 }
 	
-	function soaphandler_playlists() {
-  if(this.readyState == this.DONE) {
+function soaphandler_playlists(zone) {
+    if(this.readyState == this.DONE) {
     if(this.status == 200 && this.responseText != null)
 	{
-		console.log("\n Got 200 response for playlists:" + this.responseText);
-		console.log("\n playlists XML:" + this.responseXML);
-		processSuccessfulAjaxRequestNodes_Metadata(this.responseText, '');
+		console.log("\n [Zone " + zone + "] Got 200 response for playlists:" + this.responseText);
+		//processSuccessfulAjaxRequestNodes_Playlists(zone,this.responseText, '');
       return;
     }
 	  // something went wrong
-	console.log("\n Error in SOAP playlists handler: status = " + this.status + ", readyState = " + this.readyState + ", xml = " + this.responseText);
+	console.log("\n [Zone " + zone + "] Error in SOAP playlists handler: status = " + this.status + ", readyState = " + this.readyState + ", xml = " + this.responseText);
   }
     
 }
 
-function curry(fn, scope) {
-    scope = scope || window;
-    var args = [];
-    for (var i = 2, len = arguments.length; i < len; ++i) {
-        args.push(arguments[i]);
+function soaphandler_oneplaylist(zone) {
+    if(this.readyState == this.DONE) {
+    if(this.status == 200 && this.responseText != null)
+	{
+		console.log("\n [Zone " + zone + "] Got 200 response for one playlist:" + this.responseText);
+		//processSuccessfulAjaxRequestNodes_OnePlaylist(zone,this.responseText, '');
+      return;
     }
-    return function() {
-        var args2 = [];
-        for (var i = 0; i < arguments.length; i++) {
-            args2.push(arguments[i]);
-        }
-        var argstotal = args.concat(args2);
-        return fn.apply(scope, argstotal);
-    };
+	  // something went wrong
+	console.log("\n [Zone " + zone + "] Error in SOAP playlist handler: status = " + this.status + ", readyState = " + this.readyState + ", xml = " + this.responseText);
+  }
+    
 }
+function soaphandler_transport(zone) {
+    if(this.readyState == this.DONE) {
+    if(this.status == 200 && this.responseText != null)
+	{
+		console.log("\n [Zone " + zone + "] Got 200 response for transport:" + this.responseText);
+		//processSuccessfulAjaxRequestNodes_Transport(zone,this.responseText, '');
+		refreshCurrentlyPlaying(zone);
+      return;
+    }
+	  // something went wrong
+	console.log("\n [Zone " + zone + "] Error in SOAP transport handler: status = " + this.status + ", readyState = " + this.readyState + ", xml = " + this.responseText);
+  }
+    
+}
+
 
 // Main Ajax request function. uPnP requests go through here.
 // Here we use jQuery Ajax method because it does cross-domain without hassle.
-function sendSoapRequest(url, host, xml, soapAction, requestType) {
+function sendSoapRequest(url, host, xml, soapAction, requestType, zone) {
     url = 'http://' + host + url;
 
-	console.log("\n Sending " + xml + "\n to " + url);
+	console.log("\n [Zone " + zone + "] Sending " + xml + "\n to " + url);
 	var client = new XMLHttpRequest();
 	if (requestType == RequestType.metadata)
-	{ client.onreadystatechange = soaphandler_metadata; }
+	{ 
+		client.onreadystatechange = soaphandler_metadata.bind(client,zone);
+	}
+	
 	if (requestType == RequestType.playlists)
-	{ client.onreadystatechange = soaphandler_playlists; }
+	{ 
+		client.onreadystatechange = soaphandler_playlists.bind(client,zone);
+	}
+	if (requestType == RequestType.oneplaylist)
+	{ 
+		client.onreadystatechange = soaphandler_oneplaylist.bind(client,zone);
+	}	
+	if (requestType == RequestType.transport)
+	{ 
+		client.onreadystatechange = soaphandler_transport.bind(client,zone);
+	}	
+	
 	client.open("POST", url);
 	client.overrideMimeType("text/xml");
 	client.setRequestHeader("SOAPAction", soapAction);
 	client.send(xml);	
-	
-		/*
-    Zepto.ajax({
-        url: url,
-        type: "POST",
-        async: true,
-        beforeSend: function (xhr) {
-            xhr.setRequestHeader("SOAPAction", soapAction);
-        },
-        data: xml,
-        success: function (data, status, xhr) {
-            if (requestType == RequestType.metadata) {
-                processSuccessfulAjaxRequestNodes_Metadata(Zepto(data).find("*"), host);
-            }
-            else if (requestType == RequestType.playlists) {
-                processSuccessfulAjaxRequestNodes_Playlist(Zepto(data).find("*"), host);
-            }
-            else if (requestType == RequestType.oneplaylist) {
-                processSuccessfulAjaxRequestNodes_OnePlaylist(Zepto(data).find("*"), host);
-            }
-            else if (requestType == RequestType.transport) {
-                // If this isn't a metadata request, then we should refresh the metadata to sync UI.
-                refreshCurrentlyPlaying();
-            }
-            var response = transport.responseText ||   "no response text";
-            log("Success! \n\n" + data.xml);
-        },
-        complete: function (xhr, status) {
-            var response = status || "no response text";
-            log("Complete \n\n" + response);
-        },
-        ajaxError: function (data) {
-            var response = data ||  "no response text";
-            log("Failure! \n\n" + response);
-        },
-        error: function (xhr, status, err) { log('Exception: ' + err.message); }
-		
-    });
-	*/
+
 }
 
 function processSuccessfulAjaxRequestNodes_OnePlaylist(responseNodes, host) {
@@ -751,13 +752,7 @@ function processSuccessfulAjaxRequestNodes_OnePlaylist(responseNodes, host) {
 	
 }
 
-function CopyToClipboard() {
-    if (window.clipboardData && clipboardData.setData) {
-        clipboardData.setData("Text",_clipboard); // IE
-    }
-    // Add more clauses to deal with other browsers
-    // e.g. http://www.dynamic-tools.net/toolbox/copyToClipboard/
-}
+
 
 function processSuccessfulAjaxRequestNodes_Playlist(responseNodes, host) {
     /*if (responseNodes[0].nodeName == "s:Envelope") {
@@ -775,10 +770,10 @@ function processSuccessfulAjaxRequestNodes_Playlist(responseNodes, host) {
     }
 	*/
 }
-function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
-	console.log("processSuccessfulAjaxRequestNodes_Metadata 1");
+function processSuccessfulAjaxRequestNodes_Metadata(zone, responseText) { //TODO CURRY ABOVE AND MERGE IN OTHER PROCESSING FUNCS
+	console.log("processSuccessfulAjaxRequestNodes_Metadata for zone " + zone );
 	var xmlDoc = new REXML(responseText);
-	console.log("The root element " + xmlDoc.rootElement.name + " has " + xmlDoc.rootElement.childElements.length + " child elements.");
+	//console.log("The root element " + xmlDoc.rootElement.name + " has " + xmlDoc.rootElement.childElements.length + " child elements.");
 	var responseNodes = xmlDoc.rootElement.childElements;
 	
 	var xmliterator = new JSXMLIterator(xmlDoc.rootElement);
@@ -787,7 +782,7 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
     //for (var i = 0; i < responseNodes.length; i++) {
 	var currNode = xmliterator.xmleElem;	
         var currNodeName = currNode.name;
-		console.log("nodename = " + currNodeName);
+		//console.log("Processing metadata node " + currNodeName);
         if (currNodeName == "TrackURI") {
             var result = currNode.text;
             if (result.indexOf("x-rincon") > -1) {
@@ -802,7 +797,7 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
 				}
 				
                 if (!_autoSetToMaster) {
-                    console.log("slaved to " + _sonosTopology.zones[indx].name);
+                    console.log("Zone " + zone + " slaved to " + _sonosTopology.zones[indx].name);
 					/*Zepto('#coordinatorName')[0].innerHTML = "slaved to " + _sonosTopology.zones[indx].name;
                     Zepto('#CoordinatorMetadata')[0].className = "ElementVisible";*/
                 }
@@ -815,6 +810,32 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
                 _masterFound = true;
             }
         }
+		if (currNodeName == "CurrentTransportState") {
+			switch (currNode.text)
+			{
+				case "PAUSED_PLAYBACK":
+					_sonosTopology.zones[zone].playstate = 2;
+					break;
+				case "PLAYING":
+					_sonosTopology.zones[zone].playstate = 1;
+					break;			
+				case "STOPPED":
+					_sonosTopology.zones[zone].playstate = 0;
+					break;							
+			}
+		}
+		
+		if (currNodeName == "RelTime") {
+			var relpositions = currNode.text.split(":");
+			var positionsecs = Number(relpositions[0]) * 3600 + Number(relpositions[1]) * 60 + Number(relpositions[2]);
+			
+			_sonosTopology.zones[zone].position = positionsecs;
+		}
+		if (currNodeName == "TrackDuration") {
+			var durationparts = currNode.text.split(":");
+			var durationsecs = Number(durationparts[0]) * 3600 + Number(durationparts[1]) * 60 + Number(durationparts[2]);
+			_sonosTopology.zones[zone].duration = durationsecs;
+		}		
         if (currNodeName == "TrackMetaData") {
 			console.log("XML text: " + XMLEscape.unescape(currNode.text)); //TODO: FIX!
 			var innerMetadataXML = new REXML(XMLEscape.unescape(currNode.text));
@@ -827,7 +848,7 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
 			
             //var responseNodes2 = innerMetadataXML.rootElement.childElements;
 				var metanode = xmlmetaiterator.xmleElem;
-				console.log("Processing metadata node: " + metanode.name + " with text: " + metanode.text);
+				//console.log("Processing metadata node: " + metanode.name + " with text: " + metanode.text);
 				
            // for (var j = 0; j < responseNodes2.length; j++) {
                 switch (metanode.name) {
@@ -837,7 +858,8 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
                             jQuery('#composerName')[0].innerHTML = _currentComposer;
                         }
                         jQuery('#ComposerMetadata')[0].className = "ElementVisible";*/
-						console.log("Current Composer:" + _currentComposer);
+						console.log("Zone " + zone + " Current Composer:" + _currentComposer);
+						_sonosTopology.zones[zone].artist = _currentComposer;
                         break;
 					case "dc:albumArtist":
                         _currentArtist = XMLEscape.unescape(metanode.text);
@@ -846,8 +868,8 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
                         }
                         jQuery('#ArtistMetadata')[0].className = "ElementVisible";
 						*/
-						console.log("Current Artist:" + _currentArtist);
-						_sonosTopology.zones[indx].artist = _currentArtist
+						console.log("Zone " + zone + " Current Artist:" + _currentArtist);
+						_sonosTopology.zones[zone].artist = _currentArtist
                         break;
 					case "dc:title":
                         if (!isStreaming) {
@@ -869,10 +891,8 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
                                 _trackChange = false;
                             }
                             jQuery('#TrackMetadata')[0].className = "ElementVisible";*/
-							console.log("Current Track:" + _currentTrack);
-							console.log("Current zone:" + _sonosTopology.zones[indx]);
-							console.log("Current title:" + _sonosTopology.zones[indx].title);
-							_sonosTopology.zones[indx].title = _currentTrack;
+							_sonosTopology.zones[zone].title = _currentTrack;
+							 console.log("Zone " + zone + " Current Track:" + _currentTrack);
                         }
                         break;
 
@@ -900,8 +920,8 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
 								*/
                                 isStreaming = true;
                             }
-							console.log("Current Track:" + _currentTrack);
-							_sonosTopology.zones[indx].title = _currentTrack;
+							console.log("Zone " + zone + " Current Track:" + _currentTrack);
+							_sonosTopology.zones[zone].title = _currentTrack;
                         }
                         break;
 
@@ -914,8 +934,8 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
                         }
                         jQuery('#AlbumMetadata')[0].className = "ElementVisible";
 						*/
-						console.log("Current Album:" + _currentAlbum);
-						_sonosTopology.zones[indx].album = _currentAlbum;
+						console.log("Zone " + zone + " Current Album:" + _currentAlbum);
+						_sonosTopology.zones[zone].album = _currentAlbum;
                         break;
                     case "res":
                         var protocolInfo = metanode.attribute('protocolInfo');
@@ -924,7 +944,7 @@ function processSuccessfulAjaxRequestNodes_Metadata(responseText, host) {
                                 if (protocolInfo.toLowerCase().indexOf(_providers[k].keyword) > -1) {
                                     /*jQuery('#sourceName')[0].innerHTML = _providers[k].name;
                                     jQuery('#SourceMetadata')[0].className = "ElementVisible";*/
-									console.log("Provider:" +  _providers[k].name);
+									console.log("Zone " + zone + " Provider:" +  _providers[k].name);
                                 }
                             }
                         }
@@ -1006,9 +1026,9 @@ function send_zone_data(zone) {
 		"album": _sonosTopology.zones[zone].album,	
 		"artist": _sonosTopology.zones[zone].artist,	
 		"title": _sonosTopology.zones[zone].title,	
-		"duration":99,
-		"currenttime":2,
-		"playstate":1,
+		"duration":_sonosTopology.zones[zone].duration,
+		"currenttime":_sonosTopology.zones[zone].position,
+		"playstate":_sonosTopology.zones[zone].playstate,
 		"volume":17,
 		"muted":0
         });
@@ -1039,9 +1059,51 @@ Pebble.addEventListener("appmessage",
                           
 							if (e.payload.zoneinit)	
 							{
-								console.log("Sending zone data for zone " + e.payload.zoneinit);
-								send_zone_data(e.payload.zoneinit);
+								_selectedZone = e.payload.zoneinit;
+								console.log("Sending zone data for zone " + _selectedZone);
+								send_zone_data(_selectedZone);
 							}
+							
+							
+							if (_selectedZone && e.payload.zoneaction)
+							{
+								switch(e.payload.zoneaction)
+								{
+									case 1:
+										transport(_selectedZone,"Previous");
+										break;
+									case 2:
+										transport(_selectedZone,"Next");
+										break;
+									case 5:
+										transport(_selectedZone,"Play");
+										break;
+									case 6:
+										transport(_selectedZone,"Stop");
+										break;
+									case 7:
+										transport(_selectedZone,"Pause");
+										break;
+									case 8:
+										muteOrUnMute(_selectedZone,1);
+										break;						
+									case 9:
+										muteOrUnMute(_selectedZone,0);
+										break;																
+								}
+							}
+							/*
+								ZACTION_INIT = 0x0,			// request a refresh
+								ZACTION_BACK = 0x1,
+								ZACTION_NEXT = 0x2,
+								ZACTION_VOLUP = 0x3,
+								ZACTION_VOLDOWN = 0x4,
+								ZACTION_PLAY = 0x5,
+								ZACTION_STOP = 0x6,
+								ZACTION_PAUSE = 0x7,
+								ZACTION_MUTE = 0x8,
+								ZACTION_UNMUTE = 0x9
+								*/
 							
 							//refreshCurrentlyPlaying(1);
 							

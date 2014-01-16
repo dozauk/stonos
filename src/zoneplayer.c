@@ -49,6 +49,13 @@ enum ZoneActionKey {
 	ZACTION_INIT = 0x0,			// request a refresh
 	ZACTION_BACK = 0x1,
 	ZACTION_NEXT = 0x2,
+	ZACTION_VOLUP = 0x3,
+	ZACTION_VOLDOWN = 0x4,
+	ZACTION_PLAY = 0x5,
+	ZACTION_STOP = 0x6,
+	ZACTION_PAUSE = 0x7,
+	ZACTION_MUTE = 0x8,
+	ZACTION_UNMUTE = 0x9
 };
 
 //static void click_config_provider(ClickConfig **config, void *context);
@@ -329,6 +336,27 @@ static void click_config_provider(ClickConfig **config, void* context) {
 */
 
 
+
+static void send_action(int8_t action) {
+	
+  Tuplet value = TupletInteger(ZONE_ACTION, action);
+
+  DictionaryIterator *iter;
+  app_message_outbox_begin(&iter);
+
+  if (iter == NULL) {
+	  APP_LOG(APP_LOG_LEVEL_DEBUG, "No iterator in send_state_change!");
+    return;
+  }
+
+  dict_write_tuplet(iter, &value);
+  dict_write_end(iter);
+
+  app_message_outbox_send();
+
+}
+
+
 static void send_sync_change(int8_t state) {
 	
 	if (state == 64) {// volume up
@@ -349,11 +377,15 @@ static void send_sync_change(int8_t state) {
 	}
 
 	if (state == 0) {// play/pause
+		
+		if (state != 1) send_action(ZACTION_PLAY);  else send_action(ZACTION_PAUSE); // if not playing, make playing
+		/*
 		if (state != 1) state = 1; else state = 2; // if not playing, make playing
 		Tuplet changed_values[] = {
 		   TupletInteger(ZONE_PLAY_STATE, state) //0:stopped, 1:playing, 2:paused			
 	  };
 		app_sync_set(&sync, changed_values, ARRAY_LENGTH(changed_values));
+		*/
 	}	
 	
 	
@@ -364,25 +396,6 @@ static void send_sync_change(int8_t state) {
 static void request_zone_data() {
 	
   Tuplet value = TupletInteger(ZONE_INIT, _zoneid);
-
-  DictionaryIterator *iter;
-  app_message_outbox_begin(&iter);
-
-  if (iter == NULL) {
-	  APP_LOG(APP_LOG_LEVEL_DEBUG, "No iterator in send_state_change!");
-    return;
-  }
-
-  dict_write_tuplet(iter, &value);
-  dict_write_end(iter);
-
-  app_message_outbox_send();
-
-}
-
-static void send_action(int8_t action) {
-	
-  Tuplet value = TupletInteger(ZONE_ACTION, action);
 
   DictionaryIterator *iter;
   app_message_outbox_begin(&iter);

@@ -45,6 +45,11 @@ void marquee_text_layer_set_text(MarqueeTextLayer *marquee, const char *text) {
     marquee_text_layer_mark_dirty(marquee);
 }
 
+const char* marquee_text_layer_get_text(MarqueeTextLayer *marquee) {
+	MarqueeData *marqueedata = (MarqueeData *)layer_get_data(marquee);
+    return marqueedata->text;
+}
+
 void marquee_text_layer_set_font(MarqueeTextLayer *marquee, GFont font) {
 	MarqueeData *marqueedata = (MarqueeData *)layer_get_data(marquee);
     marqueedata->font = font;

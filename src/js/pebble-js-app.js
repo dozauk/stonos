@@ -933,7 +933,7 @@ function processSuccessfulAjaxRequestNodes_Metadata(zone, responseText) { //TODO
                         }
                         break;
 
-					case "dc:album":
+					case "upnp:album":
                         _currentAlbum = XMLEscape.unescape(metanode.text);
 						/*
                         if (_currentAlbum !== jQuery('#albumName')[0].innerHTML) {

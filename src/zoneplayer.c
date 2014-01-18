@@ -151,60 +151,80 @@ static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tup
 	
 	switch (key) {
     case ZONE_GROUP_NAME:
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_GROUP_NAME");
+		//APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_GROUP_NAME");
       break;
 
     case ZONE_ALBUM:
-		//APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_ALBUM:%s", new_tuple->value->cstring);
+		
       // App Sync keeps new_tuple in sync_buffer, so we may use it directly
-      marquee_text_layer_set_text(album_layer, new_tuple->value->cstring);
+    if (!old_tuple || (new_tuple && strcmp(old_tuple->value->cstring,new_tuple->value->cstring) != 0))
+	 {
+		marquee_text_layer_set_text(album_layer, new_tuple->value->cstring);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "New album:%s", new_tuple->value->cstring);
+	 }
       break;
 
     case ZONE_ARTIST:
-		//APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_ARTIST:%s", new_tuple->value->cstring);
-      marquee_text_layer_set_text(artist_layer, new_tuple->value->cstring);
+		
+	 if (!old_tuple || (new_tuple && strcmp(old_tuple->value->cstring,new_tuple->value->cstring) != 0))
+	  {
+      	marquee_text_layer_set_text(artist_layer, new_tuple->value->cstring);
+		  APP_LOG(APP_LOG_LEVEL_DEBUG, "New artist:%s", new_tuple->value->cstring);
+	  }
       break;
 
     case ZONE_TITLE:
-		//APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_TITLE:%s", new_tuple->value->cstring);
-      marquee_text_layer_set_text(title_layer, new_tuple->value->cstring);
+		
+	  if (!old_tuple || (new_tuple && strcmp(old_tuple->value->cstring,new_tuple->value->cstring) != 0))
+	  {
+      	marquee_text_layer_set_text(title_layer, new_tuple->value->cstring);
+		  APP_LOG(APP_LOG_LEVEL_DEBUG, "New track:%s", new_tuple->value->cstring);
+	  }
       break;	
 	
     case ZONE_DURATION:
 		//APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_DURATION:%d", new_tuple->value->uint8);
-      progress_bar_layer_set_range(progress_bar, 0, new_tuple->value->uint8);
+		if (!old_tuple || (new_tuple && new_tuple->value->uint8 != old_tuple->value->uint8))
+      		progress_bar_layer_set_range(progress_bar, 0, new_tuple->value->uint8);
       break;	
 
     case ZONE_CURRENT_TIME:
-		last_track_progress = new_tuple->value->uint8;
-		//APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_CURRENT_TIME:%d", last_track_progress);
-		progress_bar_layer_set_value(progress_bar, last_track_progress);
-	  last_updated = time(NULL);
+		
+		if (!old_tuple || (new_tuple && new_tuple->value->uint8 != old_tuple->value->uint8))
+		{
+			last_track_progress = new_tuple->value->uint8;
+			progress_bar_layer_set_value(progress_bar, last_track_progress);
+	  		last_updated = time(NULL);
+		}
       break;	
 		
     case ZONE_PLAY_STATE:
-		playstate = new_tuple->value->uint8;
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_PLAY_STATE:%d", playstate);
-      if (playstate != 1) // not playing
-	  {
-		   action_bar_layer_set_icon(action_bar, BUTTON_ID_SELECT, icon_play);
-	  }
-		else
+		if (!old_tuple || (new_tuple && new_tuple->value->uint8 != old_tuple->value->uint8))
 		{
-			action_bar_layer_set_icon(action_bar, BUTTON_ID_SELECT, icon_pause);
+			playstate = new_tuple->value->uint8;
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_PLAY_STATE:%d", playstate);
+		  if (playstate != 1) // not playing
+		  {
+			   action_bar_layer_set_icon(action_bar, BUTTON_ID_SELECT, icon_play);
+		  }
+			else
+			{
+				action_bar_layer_set_icon(action_bar, BUTTON_ID_SELECT, icon_pause);
+			}
 		}
-		
       break;			
 
 	 case ZONE_VOLUME:
 		//APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_VOLUME:%d", new_tuple->value->uint8);
-      	volume = new_tuple->value->uint8;
+		if (!old_tuple || (new_tuple && new_tuple->value->uint8 != old_tuple->value->uint8))
+      		volume = new_tuple->value->uint8;
       break;	
 
 
 	 case ZONE_MUTE:
 		//APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_MUTE:%d", new_tuple->value->uint8);
-      	muted = new_tuple->value->uint8;
+		if (!old_tuple || (new_tuple && new_tuple->value->uint8 != old_tuple->value->uint8))
+      		muted = new_tuple->value->uint8;
       break;			
 		
   }
@@ -265,7 +285,7 @@ static void window_load(Window* window) {
 	album_art_layer = bitmap_layer_create(GRect(30, 35, 64, 64));
     bitmap_layer_set_bitmap(album_art_layer, &album_art_bitmap);
     layer_add_child(window_get_root_layer(window), album_art_layer);
-    display_no_album();
+    
     
     app_callbacks = (AppMessageCallbacksNode){
         .callbacks = {
@@ -276,6 +296,8 @@ static void window_load(Window* window) {
     ipod_state_set_callback(state_callback);
     request_now_playing();
 	*/
+	
+	display_no_album();
 	
 	// Start App Sync
 	app_message_init();
@@ -501,9 +523,9 @@ static void long_clicked_select(ClickRecognizerRef recognizer, void *context) {
     }
 }
 
-/*
+
 static void display_no_album() {
     resource_load(resource_get_handle(RESOURCE_ID_ALBUM_ART_MISSING), album_art_data, 512);
-    layer_mark_dirty(album_art_layer);
+    //layer_mark_dirty(album_art_layer);
 }
-*/
+

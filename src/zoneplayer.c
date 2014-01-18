@@ -12,6 +12,10 @@ static GBitmap album_art_bitmap;
 static uint8_t album_art_data[512];
 static ProgressBarLayer *progress_bar;
 
+const int MARQUEE_TICK_MS = 50;
+const int ANIM_TICK_MS = 1000;
+const int REFRESH_TICK_MS = 10000;
+
 // Action bar icons
 static GBitmap *icon_pause;
 static GBitmap *icon_play;
@@ -25,6 +29,7 @@ static uint8_t last_track_progress;
 static uint8_t volume;
 static uint8_t muted;
 static uint8_t _zoneid;
+static uint8_t playstate;
 
 static AppSync sync;
 static uint8_t sync_buffer[256];
@@ -76,6 +81,8 @@ static bool controlling_volume = false;
 static bool is_shown = false;
 //static AppTimerHandle timer = 0;
 static AppTimer *timer;
+static AppTimer *marqueeTimer;
+static AppTimer *requestRefreshTimer;
 
 void show_zoneplayer(int zoneid) {
 	_zoneid = zoneid;
@@ -94,10 +101,24 @@ void now_playing_tick() {
     progress_bar_layer_set_value(progress_bar, progress);
 }
 
+void marquees_tick() {
+	if(!is_shown) return;
+	marquee_tick(title_layer);
+	marquee_tick(album_layer);
+	marquee_tick(artist_layer);
+	marqueeTimer = app_timer_register(MARQUEE_TICK_MS, marquees_tick, NULL);
+}
+
+void requestRefresh_tick() {
+	if(!is_shown) return;
+	request_zone_data();
+	requestRefreshTimer = app_timer_register(REFRESH_TICK_MS, marquees_tick, NULL);
+}
+
 void now_playing_animation_tick() {
     if(!is_shown) return;
-    now_playing_tick();
-    timer = app_timer_register(1000, now_playing_animation_tick, NULL);
+    if (playstate == 1) now_playing_tick(); // increment if playing
+    timer = app_timer_register(ANIM_TICK_MS, now_playing_animation_tick, NULL);
 }
 
 
@@ -124,9 +145,9 @@ static void sync_error_callback(DictionaryResult dict_error, AppMessageResult ap
 }
 
 static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Sync sync_tuple_changed_callback");
+  //APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Sync sync_tuple_changed_callback");
   if (!is_shown) return;
-	uint8_t state;
+
 	
 	switch (key) {
     case ZONE_GROUP_NAME:
@@ -134,37 +155,37 @@ static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tup
       break;
 
     case ZONE_ALBUM:
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_ALBUM:%s", new_tuple->value->cstring);
+		//APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_ALBUM:%s", new_tuple->value->cstring);
       // App Sync keeps new_tuple in sync_buffer, so we may use it directly
       marquee_text_layer_set_text(album_layer, new_tuple->value->cstring);
       break;
 
     case ZONE_ARTIST:
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_ARTIST:%s", new_tuple->value->cstring);
+		//APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_ARTIST:%s", new_tuple->value->cstring);
       marquee_text_layer_set_text(artist_layer, new_tuple->value->cstring);
       break;
 
     case ZONE_TITLE:
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_TITLE:%s", new_tuple->value->cstring);
+		//APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_TITLE:%s", new_tuple->value->cstring);
       marquee_text_layer_set_text(title_layer, new_tuple->value->cstring);
       break;	
 	
     case ZONE_DURATION:
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_DURATION:%d", new_tuple->value->uint8);
+		//APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_DURATION:%d", new_tuple->value->uint8);
       progress_bar_layer_set_range(progress_bar, 0, new_tuple->value->uint8);
       break;	
 
     case ZONE_CURRENT_TIME:
 		last_track_progress = new_tuple->value->uint8;
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_CURRENT_TIME:%d", last_track_progress);
+		//APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_CURRENT_TIME:%d", last_track_progress);
 		progress_bar_layer_set_value(progress_bar, last_track_progress);
 	  last_updated = time(NULL);
       break;	
 		
     case ZONE_PLAY_STATE:
-		state = new_tuple->value->uint8;
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_PLAY_STATE:%d", state);
-      if (state != 1) // not playing
+		playstate = new_tuple->value->uint8;
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_PLAY_STATE:%d", playstate);
+      if (playstate != 1) // not playing
 	  {
 		   action_bar_layer_set_icon(action_bar, BUTTON_ID_SELECT, icon_play);
 	  }
@@ -176,13 +197,13 @@ static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tup
       break;			
 
 	 case ZONE_VOLUME:
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_VOLUME:%d", new_tuple->value->uint8);
+		//APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_VOLUME:%d", new_tuple->value->uint8);
       	volume = new_tuple->value->uint8;
       break;	
 
 
 	 case ZONE_MUTE:
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_MUTE:%d", new_tuple->value->uint8);
+		//APP_LOG(APP_LOG_LEVEL_DEBUG, "ZONE_MUTE:%d", new_tuple->value->uint8);
       	muted = new_tuple->value->uint8;
       break;			
 		
@@ -279,8 +300,9 @@ static void window_load(Window* window) {
 	
     is_shown = true;
 	
-	timer = app_timer_register(1000, now_playing_animation_tick, NULL);
-	
+	timer = app_timer_register(ANIM_TICK_MS, now_playing_animation_tick, NULL);
+	marqueeTimer = app_timer_register(MARQUEE_TICK_MS, marquees_tick, NULL);
+	requestRefreshTimer = app_timer_register(REFRESH_TICK_MS, requestRefresh_tick, NULL);
 }
 
 
@@ -378,7 +400,20 @@ static void send_sync_change(int8_t state) {
 
 	if (state == 0) {// play/pause
 		
-		if (state != 1) send_action(ZACTION_PLAY);  else send_action(ZACTION_PAUSE); // if not playing, make playing
+		if (playstate != 1) // not playing
+		{
+				APP_LOG(APP_LOG_LEVEL_DEBUG, "Sending play action");
+				send_action(ZACTION_PLAY);;
+				playstate = 1; // assume it works i.e. playing
+				//APP_LOG(APP_LOG_LEVEL_DEBUG, "Setting pause icon");
+			 	action_bar_layer_set_icon(action_bar, BUTTON_ID_SELECT, icon_pause);
+		}
+		else{ 
+				APP_LOG(APP_LOG_LEVEL_DEBUG, "Sending pause action");
+				send_action(ZACTION_PAUSE); // if not playing, make playing
+				playstate = 2; // assume it works
+			 	action_bar_layer_set_icon(action_bar, BUTTON_ID_SELECT, icon_play);
+			}
 		/*
 		if (state != 1) state = 1; else state = 2; // if not playing, make playing
 		Tuplet changed_values[] = {
@@ -438,7 +473,8 @@ static void clicked_up(ClickRecognizerRef recognizer, void *context) {
 		send_action(ZACTION_BACK); // back
         //send_state_change(-1);
     } else {
-        send_state_change(64);
+        //send_state_change(64);
+		send_action(ZACTION_UNMUTE);
     }
 }
 static void clicked_select(ClickRecognizerRef recognizer, void *context) {
@@ -449,7 +485,8 @@ static void clicked_down(ClickRecognizerRef recognizer, void *context) {
         //send_state_change(1);
 		send_action(ZACTION_NEXT); // next
     } else {
-        send_state_change(-64);
+        //send_state_change(-64);
+		send_action(ZACTION_MUTE);
     }
 }
 

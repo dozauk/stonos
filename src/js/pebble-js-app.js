@@ -814,14 +814,20 @@ function processSuccessfulAjaxRequestNodes_Metadata(zone, responseText) { //TODO
 			switch (currNode.text)
 			{
 				case "PAUSED_PLAYBACK":
+					console.log("Zone " + zone + " Playstate = PAUSED_PLAYBACK (2)");
 					_sonosTopology.zones[zone].playstate = 2;
 					break;
 				case "PLAYING":
 					_sonosTopology.zones[zone].playstate = 1;
+					console.log("Zone " + zone + " Playstate = PLAYING (1)");
 					break;			
 				case "STOPPED":
 					_sonosTopology.zones[zone].playstate = 0;
+					console.log("Zone " + zone + " Playstate = STOPPED (0)");
 					break;							
+				default:
+					console.log("Zone " + zone + " UNKNOWN Playstate = " + currNode.text);
+					
 			}
 		}
 		
@@ -830,11 +836,13 @@ function processSuccessfulAjaxRequestNodes_Metadata(zone, responseText) { //TODO
 			var positionsecs = Number(relpositions[0]) * 3600 + Number(relpositions[1]) * 60 + Number(relpositions[2]);
 			
 			_sonosTopology.zones[zone].position = positionsecs;
+			console.log("Zone " + zone + " Position Secs:" + positionsecs);
 		}
 		if (currNodeName == "TrackDuration") {
 			var durationparts = currNode.text.split(":");
 			var durationsecs = Number(durationparts[0]) * 3600 + Number(durationparts[1]) * 60 + Number(durationparts[2]);
 			_sonosTopology.zones[zone].duration = durationsecs;
+			console.log("Zone " + zone + " Duration Secs:" + durationsecs);
 		}		
         if (currNodeName == "TrackMetaData") {
 			console.log("XML text: " + XMLEscape.unescape(currNode.text)); //TODO: FIX!
@@ -1020,8 +1028,8 @@ function send_zone_data(zone) {
 	 	/*Pebble.sendAppMessage({
 		"volume":17
         });*/
-	
- 		Pebble.sendAppMessage({
+		
+		var zoneData = {
 		"zonename":"Zone " + zone,
 		"album": _sonosTopology.zones[zone].album,	
 		"artist": _sonosTopology.zones[zone].artist,	
@@ -1031,7 +1039,11 @@ function send_zone_data(zone) {
 		"playstate":_sonosTopology.zones[zone].playstate,
 		"volume":17,
 		"muted":0
-        });
+        };
+	
+	console.log("Sending zone data:" + JSON.stringify(zoneData, null, 4));
+		
+ 		Pebble.sendAppMessage(zoneData);
 		
 	
 }
@@ -1044,6 +1056,8 @@ Pebble.addEventListener("ready",
 							// Load zones from config
 							// Set up zone state object by copying in zones
 							// Kick off a refresh for each zone to load a starting state
+							refreshCurrentlyPlaying(0);
+							refreshCurrentlyPlaying(1);
 							refreshCurrentlyPlaying(2);
 							
 							// Perhaps eventually a 10 second timer to kick another refresh off from the time of the last one?
@@ -1067,6 +1081,8 @@ Pebble.addEventListener("appmessage",
 							
 							if (_selectedZone && e.payload.zoneaction)
 							{
+								console.log("Applying transport action..");
+								
 								switch(e.payload.zoneaction)
 								{
 									case 1:
@@ -1077,18 +1093,23 @@ Pebble.addEventListener("appmessage",
 										break;
 									case 5:
 										transport(_selectedZone,"Play");
+										_sonosTopology.zones[_selectedZone].playstate = 1;
 										break;
 									case 6:
 										transport(_selectedZone,"Stop");
+										_sonosTopology.zones[_selectedZone].playstate = 0;
 										break;
 									case 7:
 										transport(_selectedZone,"Pause");
+										_sonosTopology.zones[_selectedZone].playstate = 2;
 										break;
 									case 8:
 										muteOrUnMute(_selectedZone,1);
+										_sonosTopology.zones[_selectedZone].muted = 1;
 										break;						
 									case 9:
 										muteOrUnMute(_selectedZone,0);
+										_sonosTopology.zones[_selectedZone].muted = 0;
 										break;																
 								}
 							}

@@ -71,6 +71,17 @@ void marquee_text_layer_mark_dirty(MarqueeTextLayer *marquee) {
     layer_mark_dirty(marquee);
 }
 
+void marquee_tick(MarqueeTextLayer* marquee)
+{
+	MarqueeData *marqueedata = (MarqueeData *)layer_get_data(marquee);
+    
+	marqueedata->countdown--;
+	if (marqueedata->countdown <= 0) 
+	{
+		marqueedata->offset++;	
+		layer_mark_dirty(marquee);
+	}
+}
 
 static void do_draw(MarqueeTextLayer* marquee, GContext* context) {
 

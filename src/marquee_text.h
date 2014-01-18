@@ -42,5 +42,6 @@ void marquee_text_layer_set_text(MarqueeTextLayer *marquee, const char *text);
 void marquee_text_layer_set_font(MarqueeTextLayer *marquee, GFont font);
 void marquee_text_layer_set_text_color(MarqueeTextLayer *marquee, GColor color);
 void marquee_text_layer_set_background_color(MarqueeTextLayer *marquee, GColor color);
-
+void marquee_tick(MarqueeTextLayer* marquee);
+	
 #endif
